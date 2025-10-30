@@ -3,6 +3,8 @@ import os
 import json
 import random
 import time
+import tracemalloc
+tracemalloc.start()
 import asyncio
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
