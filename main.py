@@ -510,7 +510,7 @@ async def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     print("🚀 Shogun Bot is running...")
        # حتما await، ولی دیگه asyncio.run لازم نیست
-      app.run_polling()
+    app.run_polling()
 
 # ---------------------
 # اجرای اصلی
