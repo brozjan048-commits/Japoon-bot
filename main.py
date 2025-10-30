@@ -495,7 +495,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ---------------- Run / bootstrap ----------------
 async def main():
-    TOKEN = os.getenv("TOKEN") or "8493668083:AAEpTpiPlCCiek1hmcTVfO1mDEfrLibt5t8"
+    TOKEN = os.getenv("TOKEN") or "هاهاهاها"
     app = ApplicationBuilder().token(TOKEN).build()
 
     # private choice handler MUST be added before global message handler
