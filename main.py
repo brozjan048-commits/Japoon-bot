@@ -495,19 +495,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ---------------- Run / bootstrap ----------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("سلام! بات روشن است ⚔️")
+    await update.message.reply_text("سلام! Shogun Bot روشن است ⚔️")
+
 async def main():
-    TOKEN = os.getenv("TOKEN") or "هاهاهاها"
+    TOKEN = os.environ.get("BOT_TOKEN")
+    if not TOKEN:
+        raise RuntimeError("❌ Environment variable BOT_TOKEN is not set.")
+
     app = ApplicationBuilder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, handle_message))
+    print("🚀 Shogun Bot is running...")
+    await app.run_polling()   # حتما await، ولی دیگه asyncio.run لازم نیست
 
-    # private choice handler MUST be added before global message handler
-    app.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, private_choice_handler))
-
-    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_handler))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
-    print("👑 شوگان‌بات فعال شد (دوئل سیستم ادغام شد).")
-    await app.run_polling()
-
-if __name__ == "__main__":
-    asyncio.run(main())
+# این قسمت برای Render که خودش loop دارد:
+loop = asyncio.get_event_loop()
+loop.run_until_complete(main())
