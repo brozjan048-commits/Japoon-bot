@@ -494,6 +494,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 # ---------------- Run / bootstrap ----------------
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("سلام! بات روشن است ⚔️")
 async def main():
     TOKEN = os.getenv("TOKEN") or "هاهاهاها"
     app = ApplicationBuilder().token(TOKEN).build()
