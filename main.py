@@ -3,8 +3,8 @@ import os
 import json
 import random
 import time
-import tracemalloc
-tracemalloc.start()
+import warnings
+warnings.simplefilter("ignore", RuntimeWarning)
 import asyncio
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
