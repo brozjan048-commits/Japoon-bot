@@ -1,12 +1,12 @@
-# main.py — Shogun Bot (simple RPS duels + commands)
-# Ready for Render. TOKEN must be in environment variable BOT_TOKEN.
-
+# main.py — Shogun Bot (Ready for Render)
+# TOKEN from env: BOT_TOKEN
 import os
 import json
 import random
 import time
 import asyncio
 from threading import Thread
+import datetime
 
 from flask import Flask
 from telegram import Update
@@ -19,25 +19,21 @@ from telegram.ext import (
 
 # ---------------- Config ----------------
 DATA_FILE = "shogun_data.json"
-
-# Read token from environment (Render: set env var BOT_TOKEN)
 TOKEN = os.environ.get("BOT_TOKEN")
 if not TOKEN:
-    raise RuntimeError("BOT_TOKEN environment variable is not set. Set it in Render (or your environment).")
+    raise RuntimeError("BOT_TOKEN environment variable is not set.")
 
-# For Flask keep-alive (Render provides PORT env; default 8080)
 FLASK_PORT = int(os.environ.get("PORT", 8080))
 
-# ---------------- Minimal web server for health check (so Render can probe) ----------------
-app_flask = Flask("shogun_keep_alive")
+# ---------------- Flask keep-alive ----------------
+flask_app = Flask("shogun_keepalive")
 
-@app_flask.route("/")
+@flask_app.route("/")
 def home():
-    return "Shogun Bot alive ⚔️"
+    return "Shogun Bot is alive ⚔️"
 
 def run_flask():
-    # Note: debug=False, use default server
-    app_flask.run(host="0.0.0.0", port=FLASK_PORT)
+    flask_app.run(host="0.0.0.0", port=FLASK_PORT)
 
 def start_keep_alive():
     t = Thread(target=run_flask, daemon=True)
@@ -60,7 +56,6 @@ def save_data(d):
 
 data = load_data()
 
-import datetime
 def ensure_user_obj(uid, name):
     uid = str(uid)
     if uid not in data:
@@ -70,6 +65,7 @@ def ensure_user_obj(uid, name):
             "wins": 0,
             "losses": 0,
             "streak": 0,
+            "rank": "ولگرد بی‌خانمان",
             "first_seen": datetime.date.today().isoformat()
         }
         save_data(data)
@@ -96,43 +92,29 @@ def get_rank_by_points(points):
             chosen_fa, chosen_jp = fa, jp
     return chosen_fa, chosen_jp
 
-def get_rank_index_from_points(points):
-    idx = 0
-    for i,(thr,fa,jp) in enumerate(rank_table):
-        if points >= thr:
-            idx = i
-    return idx
-
-def get_rank_threshold_by_name(rank_name):
-    for thr,fa,jp in rank_table:
-        if fa == rank_name:
-            return thr
-    return 0
-
 def check_rank_change_and_message(uid):
     uid = str(uid)
     user = data.get(uid)
     if not user:
         return None
-    old_rank = user.get("rank", get_rank_by_points(0)[0])
-    new_rank_fa, new_rank_jp = get_rank_by_points(user["points"])
-    if old_rank != new_rank_fa:
-        user["rank"] = new_rank_fa
+    old = user.get("rank", "")
+    new_fa, new_jp = get_rank_by_points(user.get("points", 0))
+    if old != new_fa:
+        user["rank"] = new_fa
         save_data(data)
-        old_idx = get_rank_index_from_points(user.get("points",0))  # approximate
-        return f"🌅 {user['name']} به مقام «{new_rank_fa}» ارتقا یافت.\nافتخار همراهت باد。\n（{user['name']}は「{new_rank_jp}」に昇進した。）"
+        return f"🌅 {user['name']} به مقام «{new_fa}» ارتقا یافت. افتخار همراهت باد。 （{user['name']}は「{new_jp}」に昇進した。）"
     return None
 
-# ---------------- Messaging templates (Persian + JP translation) ----------------
+# ---------------- Messages ----------------
 HONOR_MSGS = [
-    "🌸 افتخارِ {name} افزوده شد. راه بوشیدو با توست. （{name}の名誉が増しました。）",
-    "🏵 نامِ {name} در دفترِ افتخار حک شد؛ عزیمت به سوی شرف。 （{name}の名声が刻まれた。）",
-    "🕯 افتخارت بالا رفت، {name}. شمشیرت روشن بماند。 （{name}の刀が光る。）"
+    "🌸 افتخارِ {name} افزوده شد. راه بوشیدو با توست。 ({name}の名誉が増しました。)",
+    "🏵 نامِ {name} در دفترِ افتخار حک شد؛ عزیمت به سوی شرف。 ({name}の名声が刻まれた。)",
+    "🕯 افتخارت بالا رفت، {name}. شمشیرت روشن بماند。 ({name}の刀が光る。)"
 ]
 SEPPOKU_MSGS = [
-    "🩸 {name} سپوکو برگزید؛ شعلهٔ ناموس اندکی فرونشست。 （{name}は切腹を選んだ。）",
-    "⚔️ {name} راه سخت سپوکو را برگزید؛ نامش جاودان نشد。 （{name}は苦渋の決断をした。）",
-    "🖤 سپوکوِ {name} ثبت شد؛ درنگی برای بازنگری شرافت。 （{name}の行為が記録された。）"
+    "🩸 {name} سپوکو برگزید؛ شعلهٔ ناموس اندکی فرونشست。 ({name}は切腹を選んだ。)",
+    "⚔️ {name} راه سخت سپوکو را برگزید؛ نامش جاودان نشد。 ({name}は苦渋の決断をした。)",
+    "🖤 سپوکوِ {name} ثبت شد؛ درنگی برای بازنگری شرافت。 ({name}の行為が記録された。)"
 ]
 WELCOME_LINES = [
     "👑 من شوگانِ این دوجو هستم؛ نظم، افتخار و سکوت حکم ماست。 （将軍ボットが到着しました。）",
@@ -147,26 +129,20 @@ SPIRIT_LINES = [
     "🕊 روحِ جنگجو آرام، پایدار و بی‌هیاهوست。 （戦士の精神は静かで強い。）",
     "🔥 درونت را صیقل کن؛ فولادِ روح را بیافرین。 （内にある鋼を磨け。）"
 ]
-
 SHOGUN_INTRO = (
-    "🏯 من «شوگان» هستم — سایهٔ نظم در این دوجو، جانِ قانون و شمشیرِ عدالت. "
-    "هر قدم من حکایتی‌ست از شرافت و سنگینی وظیفه. （私は将軍、秩序の影である。）"
+    "🏯 من «شوگان» هستم — سایهٔ نظم در این دوجو، جانِ قانون و شمشیرِ عدالت.\n"
+    "هر قدم من حکایتی‌ست از شرافت و سنگینی وظیفه。 （私は将軍、秩序の影である。）"
 )
 
-# ---------------- Duel subsystem (sealed private picks) ----------------
-active_duels = {}  # key: "minid:maxid" -> duel dict
+# ---------------- Duel (sealed picks) ----------------
+active_duels = {}  # key = "minid:maxid" -> duel dict
 
 MOVE_MAP = {
     "سنگ": "strike", "stone": "strike", "strike": "strike",
     "کاغذ": "parry", "paper": "parry", "parry": "parry",
     "قیچی": "feint", "scissors": "feint", "feint": "feint"
 }
-
-BEATS = {
-    "strike": "feint",   # strike > feint
-    "feint": "parry",    # feint > parry
-    "parry": "strike"    # parry > strike
-}
+BEATS = {"strike": "feint", "feint": "parry", "parry": "strike"}
 
 def duel_key(a, b):
     a, b = str(a), str(b)
@@ -187,10 +163,9 @@ async def start_duel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     key = duel_key(challenger.id, target.id)
     if key in active_duels:
-        await update.message.reply_text("در حال حاضر یک دوئل یا درخواست معلق بین این دو نفر وجود دارد. قبل از دعوت مجدد صبر کنید.")
+        await update.message.reply_text("در حال حاضر یک دوئل یا دعوت معلق بین این دو نفر وجود دارد. قبل از دعوت مجدد صبر کنید.")
         return
 
-    # create duel entry
     active_duels[key] = {
         "chat_id": chat_id,
         "challenger": str(challenger.id),
@@ -206,19 +181,16 @@ async def start_duel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "لطفاً تا 60 ثانیه انتخاب کنید."
     )
 
-    # DM both
     try:
         await context.bot.send_message(challenger.id, f"دوئل با {target.first_name} ثبت شد — لطفاً یکی از: سنگ / کاغذ / قیچی را اینجا بفرست (60s).")
         await context.bot.send_message(target.id, f"دوئل با {challenger.first_name} ثبت شد — لطفاً یکی از: سنگ / کاغذ / قیچی را اینجا بفرست (60s).")
     except Exception:
-        # cleanup and inform group
         active_duels.pop(key, None)
         await update.message.reply_text(
             "خطا: یکی از طرفین پیام خصوصی با بات را باز نکرده است. از هر دو بخواهید ابتدا در چت خصوصی /start بزنند و دوباره تلاش کنید."
         )
         return
 
-    # schedule timeout watcher
     asyncio.create_task(_duel_timeout_watcher(key, context, 60))
 
 async def _duel_timeout_watcher(key, context, wait_seconds):
@@ -226,16 +198,13 @@ async def _duel_timeout_watcher(key, context, wait_seconds):
     duel = active_duels.get(key)
     if not duel:
         return
-    missing = []
     for uid in (duel["challenger"], duel["target"]):
         if uid not in duel["choices"]:
-            missing.append(uid)
-    for uid in missing:
-        duel["choices"][uid] = random.choice(["strike", "parry", "feint"])
-        try:
-            await context.bot.send_message(int(uid), "زمان انتخاب شما تمام شد؛ حرکتی تصادفی برای شما انتخاب شد.")
-        except:
-            pass
+            duel["choices"][uid] = random.choice(["strike", "parry", "feint"])
+            try:
+                await context.bot.send_message(int(uid), "زمان انتخاب شما تمام شد؛ حرکتی تصادفی برای شما انتخاب شد.")
+            except:
+                pass
     await _resolve_duel(key, context)
 
 async def private_choice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -249,10 +218,9 @@ async def private_choice_handler(update: Update, context: ContextTypes.DEFAULT_T
         if len(parts) >= 2:
             move = MOVE_MAP.get(parts[1])
     if not move:
-        await update.message.reply_text("لطفاً یکی از: سنگ / کاغذ / قیچی (یا strike / parry / feint) را بفرست.")
+        await update.message.reply_text("لطفاً یکی از: سنگ / کاغذ / قیچی را بفرست.")
         return
 
-    # find duel where this user participates and hasn't chosen yet
     found = None
     for key, duel in active_duels.items():
         if str(user.id) in (duel["challenger"], duel["target"]):
@@ -287,13 +255,11 @@ async def _resolve_duel(key, context: ContextTypes.DEFAULT_TYPE):
         active_duels.pop(key, None)
         return
 
-    # ensure users exist
     ensure_user_obj(a_id, data.get(a_id, {}).get("name", "ناشناس"))
     ensure_user_obj(b_id, data.get(b_id, {}).get("name", "ناشناس"))
     A = data[a_id]
     B = data[b_id]
 
-    # tie
     if a_move == b_move:
         await context.bot.send_message(chat_id,
             f"⚖️ تساوی بین {A['name']} و {B['name']} — هر دو {a_move} انتخاب کردند. هیچ امتیازی تغییر نکرد.")
@@ -301,7 +267,6 @@ async def _resolve_duel(key, context: ContextTypes.DEFAULT_TYPE):
         save_data(data)
         return
 
-    # determine winner by RPS
     if BEATS[a_move] == b_move:
         winner_id, loser_id = a_id, b_id
         winner_move, loser_move = a_move, b_move
@@ -313,7 +278,6 @@ async def _resolve_duel(key, context: ContextTypes.DEFAULT_TYPE):
         active_duels.pop(key, None)
         return
 
-    # apply base changes
     winner = data[winner_id]
     loser = data[loser_id]
 
@@ -347,11 +311,10 @@ async def _resolve_duel(key, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_message(chat_id, summary)
 
-    # cleanup
     active_duels.pop(key, None)
     save_data(data)
 
-# ---------------- Core handlers (welcome, profile, commands) ----------------
+# ---------------- Core handlers ----------------
 async def welcome_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.new_chat_members:
         for member in update.message.new_chat_members:
@@ -369,9 +332,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ensure_user_obj(uid, sender.first_name)
         user = data[uid]
         rank_fa, rank_jp = get_rank_by_points(user.get("points", 0))
-        next_idx = get_rank_index_from_points(user.get("points", 0)) + 1
-        next_thr = rank_table[next_idx][0] if next_idx < len(rank_table) else None
-        need = (next_thr - user["points"]) if next_thr is not None else 0
+        next_idx = 0
         reply = (
             f"👤 پروفایل {user['name']}\n"
             f"🎖 امتیاز: {round(user['points'],2)}\n"
@@ -379,32 +340,25 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"⚔️ بردها: {user.get('wins',0)} — باخت‌ها: {user.get('losses',0)}\n"
             f"📅 عضو از: {user.get('first_seen','-')}\n"
         )
-        if next_thr:
-            reply += f"⬆️ تا رتبهٔ بعدی {round(need,2)} امتیاز باقی است.\n"
-        else:
-            reply += "👑 تو در اوجِ شوگان ایستاده‌ای.\n"
-        reply += f"（プロフィール：{user['name']}、名誉：{user['points']}）"
         await update.message.reply_text(reply)
         return
 
-    # class-less simple: no class here (we omitted classes for now)
-
-    # duel trigger
+    # duel
     if text == "دوئل":
         await start_duel(update, context)
         return
 
-    # tea
+    # chay
     if text == "چای":
         await update.message.reply_text(random.choice(TEA_LINES))
         return
 
-    # spirit
+    # rooh
     if text == "روح":
         await update.message.reply_text(random.choice(SPIRIT_LINES))
         return
 
-    # shogun intro (grand)
+    # shogun intro
     if text == "شوگان":
         await update.message.reply_text(SHOGUN_INTRO)
         return
@@ -412,11 +366,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # honor
     if text == "افتخار":
         if not replied:
-            await update.message.reply_text("برای دادن افتخار، باید پیام کسی را ریپلای کنی。 （返信が必要です。）")
+            await update.message.reply_text("برای دادن افتخار، باید پیام کسی را ریپلای کنی。")
             return
         target = replied.from_user
         if target.id == sender.id:
-            await update.message.reply_text("نمی‌توانی به خودت افتخار بدهی。 （自分にはあげられない。）")
+            await update.message.reply_text("نمی‌توانی به خودت افتخار بدهی。")
             return
         rid = str(target.id)
         ensure_user_obj(rid, target.first_name)
@@ -434,7 +388,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # seppuku
     if text == "سپوکو":
         if not replied:
-            await update.message.reply_text("برای سپوکو باید پیام کسی را ریپلای کنی。 （返信が必要です。）")
+            await update.message.reply_text("برای سپوکو باید پیام کسی را ریپلای کنی。")
             return
         target = replied.from_user
         rid = str(target.id)
@@ -453,7 +407,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # leaderboard
     if text == "افتخارات":
         if not data:
-            await update.message.reply_text("هنوز افتخاری ثبت نشده است。 （名誉はまだありません。）")
+            await update.message.reply_text("هنوز افتخاری ثبت نشده است。")
             return
         board = sorted(data.items(), key=lambda x: x[1].get("points",0), reverse=True)
         out = "🏯 جدول افتخارات شوگان‌بات:\n\n"
@@ -477,44 +431,43 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(rules_text)
         return
 
-    # reward: add +2 to everybody in data (admin-only)
+    # reward (admin)
     if text.startswith("پاداش"):
-        # check admin
         try:
             member = await context.bot.get_chat_member(chat_id, sender.id)
             if member.status not in ("administrator", "creator"):
-                await update.message.reply_text("فقط ادمین‌ها می‌توانند پاداش عمومی اعطا کنند。 （管理者のみ可能です。）")
+                await update.message.reply_text("فقط ادمین‌ها می‌توانند پاداش عمومی اعطا کنند。")
                 return
         except Exception:
-            # if API fails, deny
             await update.message.reply_text("ناتوانی در بررسی دسترسی. تنها ادمین‌ها مجازند。")
             return
 
-        # grant +2 to all known users
         for uid, info in data.items():
             data[uid]["points"] = float(data[uid].get("points",0)) + 2.0
         save_data(data)
-        await update.message.reply_text("🎁 پاداش عمومی: همهٔ کاربرانِ ثبت‌شده +2 امتیاز گرفتند。 （全員に+2ポイント付与。）")
+        await update.message.reply_text("🎁 پاداش عمومی: همهٔ کاربرانِ ثبت‌شده +2 امتیاز گرفتند。")
         return
 
 # ---------------- Run / bootstrap ----------------
 async def main():
-    # start small webserver for healthchecks
     start_keep_alive()
 
     app = ApplicationBuilder().token(TOKEN).build()
 
-    # private handler for choices (must be added before global text handler)
+    # private choice handler must be added before global text handler
     app.add_handler(MessageHandler(filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, private_choice_handler))
-
-    # welcome new members
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_handler))
-
-    # global text handler
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     print("👑 شوگان‌بات اجرا شد — شروع poll.")
     await app.run_polling()
 
 if __name__ == "__main__":
+    # apply nest_asyncio to avoid event-loop close errors in hosted envs
+    try:
+        import nest_asyncio
+        nest_asyncio.apply()
+    except Exception:
+        pass
+
     asyncio.run(main())
